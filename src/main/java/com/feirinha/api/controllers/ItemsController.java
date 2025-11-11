@@ -9,6 +9,7 @@ import com.feirinha.api.dtos.ItemDTO;
 import com.feirinha.api.models.ItemModel;
 import com.feirinha.api.repositories.ItemRepository;
 
+import io.micrometer.common.lang.NonNull;
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -52,13 +53,20 @@ public class ItemsController {
     }
 
     @PutMapping("/{id}")
-    public String updateItem(@PathVariable("id") Long id, @RequestBody String body) {
-        return "item " + id + " atualizado para " + body;
+    public void updateItem(@PathVariable("id") Long id, @RequestBody @Valid ItemDTO body) {
+        Optional<ItemModel> item = itemRepository.findById(id);
+
+        if (!item.isPresent()) {
+            // TODO: tratar depois
+        }
+        ItemModel newItem = new ItemModel(body);
+        newItem.setId(id);
+        itemRepository.save(newItem);
     }
 
     @DeleteMapping("/{id}")
-    public String deleteItem(@PathVariable("id") Long id) {
-        return id + " deletado";
+    public void deleteItem(@PathVariable("id") Long id) {
+        itemRepository.deleteById(id);
     }
 
 }
