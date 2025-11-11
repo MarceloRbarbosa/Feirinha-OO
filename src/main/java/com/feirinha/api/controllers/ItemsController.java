@@ -2,12 +2,11 @@ package com.feirinha.api.controllers;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import java.util.List;
 import java.util.Optional;
 
 import com.feirinha.api.dtos.ItemDTO;
 import com.feirinha.api.models.ItemModel;
-import com.feirinha.api.repositories.ItemRepository;
+import com.feirinha.api.services.ItemService;
 
 import jakarta.validation.Valid;
 
@@ -25,20 +24,20 @@ import org.springframework.web.bind.annotation.PutMapping;
 
 public class ItemsController {
 
-    final ItemRepository itemRepository;
+    final ItemService itemService;
 
-    ItemsController(ItemRepository itemRepository) {
-        this.itemRepository = itemRepository;
+    ItemsController(ItemService itemService) {
+        this.itemService = itemService;
     }
 
     @GetMapping()
     public ResponseEntity<Object> getItems() {
-        return ResponseEntity.status(HttpStatus.OK).body(itemRepository.findAll());
+        return ResponseEntity.status(HttpStatus.OK).body(itemService.getItems());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Object> getItemById(@PathVariable("id") Long id) {
-        Optional<ItemModel> item = itemRepository.findById(id);
+        Optional<ItemModel> item = itemService.getItemById(id);
 
         if (!item.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Este item não existe");
@@ -49,27 +48,41 @@ public class ItemsController {
 
     @PostMapping()
     public ResponseEntity<Object> createItem(@RequestBody @Valid ItemDTO body) {
-        ItemModel item = new ItemModel(body);
-        itemRepository.save(item);
-        return ResponseEntity.status(HttpStatus.CREATED).body(item);
+        Optional<ItemModel> item = itemService.createItem(body);
+
+        if (!item.isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Este item já existe");
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(item.get());
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Object> updateItem(@PathVariable("id") Long id, @RequestBody @Valid ItemDTO body) {
-        Optional<ItemModel> item = itemRepository.findById(id);
+        try {
+            Optional<ItemModel> item = itemService.updateItem(id, body);
 
-        if (!item.isPresent()) {
-            ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            if (!item.isPresent()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Item não encontrado");
+            }
+
+            return ResponseEntity.status(HttpStatus.OK).body(item.get());
+
+        } catch (RuntimeException e) {
+            if (e.getMessage().equals("DuplicateItem")) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Já existe um item com este nome");
+            }
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erro ao atualizar item");
         }
-        ItemModel newItem = new ItemModel(body);
-        newItem.setId(id);
-        itemRepository.save(newItem);
-        return ResponseEntity.status(HttpStatus.OK).body(item);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Object> deleteItem(@PathVariable("id") Long id) {
-        itemRepository.deleteById(id);
+        boolean deleted = itemService.deleteItem(id);
+
+        if (!deleted) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Item não encontrado");
+        }
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
